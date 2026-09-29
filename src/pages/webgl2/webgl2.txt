@@ -1,0 +1,327 @@
+1. webgl api 是为这些函数对的运行来设置状态：设置一堆状态，然后调用 gl.drawArrays 和 gl.drawElements 在 gpu 上运行着色器
+2. 着色器有四种方法能够接收数据：
+   (1.属性，缓冲区，和顶点数组
+   (2.Uniforms(执行着色器程序前设置的全局变量)
+   (3.纹理（能够在着色器程序中随机访问的数组数据）
+   (4.Varyings（是一种从着色器到片段着色器传递数据的方法）
+
+3. webgl 只关注两件事：剪辑空间坐标（点着色器提供剪辑空间坐标）和颜色
+
+4. 点着色器得工作是生成裁剪空间坐标；gl_Position 来设置该点在剪裁空间得坐标
+
+5. 裁剪器需要获得的数据来源有三种方式：
+   (1.属性（从缓冲区取数据）
+      <1. 创建缓冲区：const buf = gl.createBuffer()
+      <2. 把数据放入到缓冲区: gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,someData,gl.STATIC_DRAW)
+      <3. 在着色器程序中查找属性的位置：const positionLocation = gl.getAttribLocation(someShaderProgram,"a_position")
+      <4. 告诉 webgl 如何将数据从这些缓冲区中取出并放入属性中：gl.enableVertexAttribArray(positionLocation)
+      var numComponents = 3; // (x, y, z)
+      var type = gl.FLOAT;
+      var normalize = false; // 保持值不变
+      var offset = 0; // 从缓冲区的开头开始
+      var stride = 0; //移动到下一个顶点多少字节
+      // 0 = 使用 type 和 numComponents 使用正确的步幅
+      gl.vertexAttribPointer(positionLoc, numComponents, type, false, stride, offset);
+
+   (2.Uniforms（在单次绘制过程中，它的值对所有顶点都是一样的）
+      <通过 uniform 为着色器添加偏移量
+
+   (3.纹理（来自 pixels/texels 的数据）
+
+6. 片段着色器的任务是给栅格化的像素提供颜色；片段着色器获取的数据的方式：(1.Uniforms (2.纹理 (3.Varyings
+
+7. 过程
+   （1.定义顶点着色器（vertexShaderSource），片段着色器（fragmentShaderSource）
+   （2.创建两个着色器（createShader）
+   （3.链接两个着色器成一个程序（createProgram）并调用它（linkProgram）
+   （4.查找顶点数据放在哪里(a_position) 查找颜色(a_color) 查找矩阵（u_matrix） 。。。
+   （5.创建缓冲区（createBuffer）绑定缓冲区（bindBuffer）
+   （6.创建属性状态集合（createVertexArray） 绑定属性状态集合（bindVertexArray）
+   （7.绑定数据 gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+   （8.启用属性（enableVertexAttribArray）
+   （9.填入数据(gl.bufferData)
+   （10.诉属性如何从 positionBuffer 中获取数据（size,type,normalize,stride,offset）(vertexAttribPointer)
+   （11.从剪辑空间转换为像素(viewport)
+   （12.清理 canvas（clearColor，clear）
+   （13.使用程序（useProgram）
+   （14.绑定属性/缓冲区集（bindVertexArray）
+   （15.设置属性（primitiveType,offset,count）draw（drawArrays）
+
+8. 属性
+      a_position:顶点坐标；唯一输入属性；数据类型 vec2
+      u_resolution:uniforms 属性，为画布显示精度；通过 gl.uniformXXX 设置 uniform 的值 ()
+      u_color:uniforms 属性，颜色值可以动态设置 uniform vec4 u_color;
+
+   输入参数：
+      a_position:顶点坐标
+      a_texCoord：纹理坐标
+      a_color:顶点颜色
+
+   输出到片段着色器的参数：
+      v_texCoord:纹理坐标
+      v_fragmentColor：顶点颜色
+
+
+9.  a_position: 点的着色器，从缓冲区接收数据
+    a_texCoord：纹理坐标；用于将纹理坐标传递给片段着色器
+    u_resolution: 用于传入画布的分辨率
+    u_color: 颜色值可以动态设置 uniform4fv
+    u_image: 用于将纹理图像传递给片段着色器 uniform1i
+    u_translation: 移动到位置 uniform2fv
+    u_rotation:旋转
+    u_scale: 缩放 uniform2fv
+    u_matrix:根据矩阵转换位置  uniformMatrix4fv
+    gl_Position: 中vec4分别表示 (x,y,z,w)，其中w表示其次坐标，取值范围【0，-1】；齐次坐标 (x,y,z,w)等价于三维(x/w,y/w,z/w) ;如果w趋近于0，表示点将趋近于无穷远; WebGL 使用 W 实现纹理映射或者可变量插值的透视投影
+    gl_PointSize：表示点尺寸（像素），默认为1；
+    gl_FragColor：指定片元颜色，vec4分别表示(r, g, b, a)值；
+
+10. 数据类型
+   (1. float, vec2, vec3, vec4, mat2, mat3, mat4, int, ivec2, ivec3, ivec4, uint, uvec2, uvec3, uvec4.
+      gl.uniform1f (floatUniformLoc, v);                 // 对于浮动
+      gl.uniform1fv(floatUniformLoc, [v]);               // 对于 float 或 float 数组
+      gl.uniform2f (vec2UniformLoc,  v0, v1);            // 对于 vec2
+      gl.uniform2fv(vec2UniformLoc,  [v0, v1]);          // 对于 vec2 或 vec2 数组
+      gl.uniform3f (vec3UniformLoc,  v0, v1, v2);        // 对于 vec3
+      gl.uniform3fv(vec3UniformLoc,  [v0, v1, v2]);      // 对于 vec3 或 vec3 数组
+      gl.uniform4f (vec4UniformLoc,  v0, v1, v2, v4);    // 对于 vec4
+      gl.uniform4fv(vec4UniformLoc,  [v0, v1, v2, v4]);  // 对于 vec4 或 vec4 数组
+
+      gl.uniformMatrix2fv(mat2UniformLoc, false, [  4x element array ])  // 对于 mat2 或 mat2 数组
+      gl.uniformMatrix3fv(mat3UniformLoc, false, [  9x element array ])  // 对于 mat3 或 mat3 数组
+      gl.uniformMatrix4fv(mat4UniformLoc, false, [ 16x element array ])  // 对于 mat4 或 mat4 数组
+
+      gl.uniform1i (intUniformLoc,   v);                 // 对于整数
+      gl.uniform1iv(intUniformLoc, [v]);                 // 对于 int 或 int 数组
+      gl.uniform2i (ivec2UniformLoc, v0, v1);            // 对于 ivec2
+      gl.uniform2iv(ivec2UniformLoc, [v0, v1]);          // 对于 ivec2 或 ivec2 数组
+      gl.uniform3i (ivec3UniformLoc, v0, v1, v2);        // 对于 ivec3
+      gl.uniform3iv(ivec3UniformLoc, [v0, v1, v2]);      // 对于 ivec3 或 ivec3 数组
+      gl.uniform4i (ivec4UniformLoc, v0, v1, v2, v4);    // 对于 ivec4
+      gl.uniform4iv(ivec4UniformLoc, [v0, v1, v2, v4]);  // 对于 ivec4 或 ivec4 数组
+
+      gl.uniform1i (sampler2DUniformLoc,   v);           // 对于 sampler2D（纹理）
+      gl.uniform1iv(sampler2DUniformLoc, [v]);           // 对于 sampler2D 或 sampler2D 数组
+
+      gl.uniform1i (samplerCubeUniformLoc,   v);         // 对于 samplerCube（纹理）
+      gl.uniform1iv(samplerCubeUniformLoc, [v]);         // 对于 samplerCube 或 samplerCube 数组
+
+11. 二维 m3  /2d/index
+12. 三维 m4  /3d/index
+13. 三维透视： 远近
+14. 三维摄像机： xyz
+      矩阵：
+         Xx  Xy  Xz   <- x axis
+         Yx  Yy  Yz   <- y axis
+         Zx  Zy  Zz   <- z axis
+         Tx  Ty  Tz   <- 相机位置
+
+15. 纹理
+   (1.创建纹理  gl.createTexture
+   (2.使用纹理单元0  gl.activeTexture(gl.TEXTURE + 0)
+   (3.绑定纹理 gl.bindTexture(gl.TEXTURE_2D,texture)绑定到纹理单元0的TEXTURE_2D绑定点
+   (4.用1x1蓝色像素填充纹理:gl.texImage2D()
+
+16.数据纹理
+   格式             数据类型                  通道数/单像素字节数
+   RGBA             UNSIGNED_BYTE            4
+   RGB              UNSIGNED_BYTE            3
+   RGBA             UNSIGNED_SHORT_4_4_4_4   2
+   RGBA             UNSIGNED_SHORT_5_5_5_1   2
+   RGB	           UNSIGNED_SHORT_5_6_5	3	2
+   LUMINANCE_ALPHA  UNSIGNED_BYTE          	2
+   LUMINANCE	     UNSIGNED_BYTE	         1
+   ALPHA	           UNSIGNED_BYTE	         1
+
+17. 纹理属性
+   gl.generateMipmap：每个子图都是前一级的双线性插值， gl.generateMipmap 它根据原始图像创建所有的缩小级别
+      NEAREST = 从最大的贴图中选择 1 个像素
+      LINEAR = 从最大的贴图中选择 4 个像素然后混合
+      NEAREST_MIPMAP_NEAREST = 选择最合适的贴图，然后从上面找到一个像素
+      LINEAR_MIPMAP_NEAREST = 选择最合适的贴图，然后取出 4 个像素进行混合
+      NEAREST_MIPMAP_LINEAR = 选择最合适的两个贴图，从每个上面选择 1 个像素然后混合
+      LINEAR_MIPMAP_LINEAR = 选择最合适的两个贴图，从每个上选择 4 个像素然后混合
+   gl.texParameter：设置筛选器
+   gl.vertexAttribPointer():绑定当前的ARRAY_BUFFER到这个属性
+
+18.通过两种方式设置画布drawingbuffer尺寸，一种是使用HTML
+      <canvas id="c" width="400" height="300"></canvas>
+   一种是javascript
+      const canvas = document.querySelector('#c')
+      canvas.width = 400
+      canvas.height = 300
+
+19. 绘制rectangle
+   //用定义矩形的值填充缓冲区
+   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(),gl.STATIC_DRAW)
+   //设置颜色
+   gl.uniform4f(colorLocation,Math.random(),Math.random,Math.random,1)
+   //Draw the rectangle.
+   gl.drawArrays(mode,first,count)
+      mode:告诉系统画点(gl.POINTS)、线(gl.LINES)，还是三角形(gl.TRIANGLES)
+      first:指定顶点开始绘制的位置
+      count:绘制图形的顶点数
+
+
+20. 绘制一个点
+   1. webGL的绘制依赖着色器（shader）的绘图机制；
+   2. 着色器（shader）提供了二维和三维的绘图方法；
+   3. 着色器程序是以字符串的形式嵌入到js文件中；
+   4. 顶点着色器（Vertex shader）：用来描述顶点特性（如位置、颜色等）；
+   5. 顶点（Vertex）：指二维或三维空间中的一个点；
+   6. 片元着色器（Fragment shader）：进行逐片元处理过程，比如光照；
+   7. 片元（Fragment）：一个webGL术语，可以理解为像素；
+
+21. webGL 坐标系统
+   1. 采用笛卡尔坐标系
+   2. 面向屏幕，X轴正向 - 水平向右；Y轴正向 - 垂直向上 ；Z轴垂直屏幕向外
+   3. 原点在画布中心
+
+22. 改变颜色
+   使用uniform变量给片元着色器传值，让每个点击的点上色
+
+23. 片段着色器属性
+      precision:precision为精度限定词，总的来说精度越高，执行效率越低；
+      precision highp float;片段着色器没有默认精度， highp 是一个很好的默认值。意思是“高精度”
+      precision mediump float; 定义使用中等精度的浮点数
+
+24. 绘制多个点 （构成三维模型的基本单位是三角形）
+   《1. 缓冲区对象：可以一次性地向着色器传入多个顶点数据
+   《2. 写入缓冲区对象的五个步骤：
+         (1.创建缓冲区对象 (gl.createBuffer())
+         (2.绑定缓冲区对象 (gl.bindBuffer())
+         (3.把数据写入缓冲区对象(gl.bufferData())
+         (4.把缓冲区对象分配给一个attribute变量 (gl.vertexAttribPointer())
+         (5.开启attribute变量 (gl.enableVertexAttribArray())
+   《3. createBuffer：返回一个WebGLBuffer的实例
+   《4. createBuffer：可以通过gl.deleteBuffer(buffer)删除指定的缓冲区对象
+   《5. bindBuffer：允许使用buffer的缓冲区并绑定到target指定的目标上
+   《6. bundBuffer：gl.bindBuffer([target],[buffer])
+   《7. bindBuffer：target-
+                     gl.ARRAY_BUFFER：表示缓冲区对象中包含了顶点的数据
+                     gl.ELEMENT_ARRAY_BUFFER：表示缓冲区中包含了顶点的索引值
+   《8. bindBuffer：buffer - 通过createBuffer返回的缓冲区对象
+   《9. bufferData：向绑定再target上的缓冲区对象中写入数据data
+   《10. bufferData：gl.bufferData([target],[data],[usage])
+   《11. bufferData：target同时为 - gl.ARRAY_BUFFER/gl.ELEMENT_ARRAY_BUFFER
+   《12. bufferData：data - 写入的数据，类型化数组
+   《13.  bufferData：usage - 表示程序将如何使用缓冲区对象中的数据，可以帮助优化WebGL优化操作，增加效率，取值范围如下：
+            gl.STATIC_DRAW：只向缓冲区对象写入一次数据，但要绘制很多次；
+            gl.STREAM_DRAW：只向缓冲区对象写入一次数据，然后绘制若干次；
+            gl.DYNAMIC_DRAW：会向缓冲区对象写入多次数据，并且绘制很多次；
+   《14. vertexAttribPointer：将绑定到gl.ARRAY_BUFFER的缓冲区对象分配给由location指定的attribute变量；把缓冲区对象分配给a_Position变量
+   《15. vertexAttribPointer：gl.ertexAttribPointer(location, size, type, normalized, stride, offset)；
+   《16. vertexAttribPointer：location - getAttribLocation的返回值，绑定了attribute变量；
+   《17. vertexAttribPointer：size - 指定缓冲区中每个顶点的分量个数，取值[1, 4]，依次表示 x、y、z、w，不足按xyz默认为0，w默认为1补齐；
+   《18.  vertexAttribPointer：type - 指定数据格式，包括：
+         gl.UNSIGNED_BYTE：相当于类型化数组的 - Uint8Array；
+         gl.SHORT：相当于类型化数组的 - Int16Array；
+         gl.UNSIGNED_SHORT：UInt16Array；
+         gl.INT：Int32Array；
+         gl.UNSIGNED_INT：Uint32Array；
+         gl.FLOAT：Float32Array；
+   《19.  vertexAttribPointer：normalized - 是否将非浮点类型的数字归一化到 [0, 1] 或 [-1, 1] 区间；
+   《20. vertexAttribPointer：stride - 指定相邻两个顶点的字节数，默认为0（0表示按照type的位数直接平分offset之后剩下的buffer）；
+   《21. vertexAttribPointer：offset - 以字节为单位，指定缓冲区对象中的偏移量（即attribute变量从缓冲区中的何处开始存储）；
+   《22. vertexAttribPointer：在第二部分第五章有补充用法的demo；
+   《23. enableVertexAttribArray：开启location指定的attribute变量；
+   《24. enableVertexAttribArray：enableVertexAttribArray(location)；
+   《25. enableVertexAttribArray：可以使用disableVertexAttribArray(location)来关闭；
+   《26. drawArrays不能超过缓冲区的点数量；
+
+25. 绘制三角形、正方形
+   《1. gl.drawArrays:有其中不同的绘制模式
+         gl.POINTS：一系列点，绘制再v0，v1，v2...
+         gl.LINES：一系列线段，绘制在(v0,v1),(v2,v3),(v4,v5)...
+         gl.LINE_STRIP：一系列连接的线段，绘制在(v0,v1),(v1,v2),(v2,v3)...
+         gl.LINE_LOOP：一系列连接且闭合的线段，绘制在(v0,v1),(v1,v2),(v2,vc3),...,(vn,v0)
+         gl.TRIANGLES：一系列单独的三角形，绘制在 (v0, v1, v2), (v3, v4, v5)...
+         gl.TRIANGLES_STRIP：一系列条带状的三角形，绘制在 (v0, v1, v2), (v2, v1, v3), (v2, v3, v4)...
+         gl.TRIANGLE_STRIP：当前点为奇数点，点序：(n, n + 1, n + 2)；当前点为偶数，点序：(n + 1, n, n + 2)；
+         gl.TRIANGLE_STRIP - 确保每个三角形都是逆时针方向连接 => 统一法向量方向 => 光反射方向；
+         gl.TRIANGLE_FAN：一系列三角形组成类似扇形的图形，绘制在 (v0, v1, v2), (v0, v2, v3), (v0, v3, v4)... ；
+26. 移动
+   《1. 移动前坐标：(x,y,z,w)，移动后的坐标:(x_after,y_after,z_after,w_after)，移位向量：(x_delta,y_delta,z_delta,w_delta);关系如下：
+         x + x_delta = x_after;    y + y_delta = y_after;  z + z_delta = z_after;  w + w_delta = 0
+   《2. 其中变化后的必为1
+
+27. 旋转
+   《1. 通过旋转轴（向量值）、旋转方向（顺逆时针） 、 旋转角度来描述一个旋转
+   《2. 正旋转 -》 角度为正值 -》 沿旋转轴方向的逆时针旋转
+   《3. 设旋转前向量为(x, y)，旋转后向量为(x_after, y_after)，旋转角度为p，2D旋转公式为：
+         x_after = x * cos(p) - y * sin(p)；
+         y_after = x * sin(p) + y * cos(p)；
+         z_after = z；
+   《4. 推理用到的公式：sin(A +/- B) = sinA * cosB +/- cosA * sinB；cos(A +/- B) = cosA * cosB -/+ sinA * sinB；
+   《5. 弧度（rad）：弧长等于半径的弧，其所对的圆心角为1弧度。
+   《6. 角度弧度转换：180º = π * rad；
+
+         rotatedX = a_position.x * u_rotation.y + a_position.y * u_rotation.x;
+         rotatedY = a_position.y * u_rotation.y - a_position.x * u_rotation.x;
+
+28. 矩阵(3D)
+      //顶点着色器
+      attribute vec2 a_position;
+      uniform vec2 u_resolution;
+      uniform vec2 u_translation;
+      uniform vec2 u_rotation;
+      uniform vec2 u_scale;
+      void main() {
+         // 缩放位置
+         vec2 scaledPosition = a_position * u_scale;
+         // 旋转位置
+         vec2 rotatedPosition = vec2(
+         scaledPosition.x * u_rotation.y + scaledPosition.y * u_rotation.x,
+         scaledPosition.y * u_rotation.y - scaledPosition.x * u_rotation.x);
+         // 添加translation.
+         vec2 position = rotatedPosition + u_translation;
+      }
+
+      // 旋转
+      const ANGLE = 45; // 旋转90度
+      const radian = Math.PI * ANGLE / 180.0; // 转为弧度
+      const cosA = Math.cos(radian);
+      const sinA = Math.sin(radian);
+      // 角度矩阵
+      const xformMatrix_rotate = new Float32Array([
+         cosA, sinA, 0.0, 0.0,
+         -sinA, cosA, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0
+      ]);
+      // 平移
+      const Tx = 0.1, Ty = 0.2, Tz = 0.0;
+      const xformMatrix_move = new Float32Array([
+         1.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         Tx, Ty, Tz, 1.0
+      ]);
+      // 缩放
+      const Sx = 1, Sy = 2, Sz = 1;
+      const xformMatrix = new Float32Array([
+         Sx, 0.0, 0.0, 0.0,
+         0.0, Sy, 0.0, 0.0,
+         0.0, 0.0, Sz, 0.0,
+         0.0, 0.0, 0.0, 1.0
+      ]);
+      //计算矩阵
+      var translationMatrix = makeTranslation(translation[0], translation[1]);
+      var rotationMatrix = makeRotation(angleInRadians);
+      var scaleMatrix = makeScale(scale[0], scale[1]);
+
+      // 将矩阵相乘
+      var matrix = matrixMultiply(scaleMatrix, rotationMatrix);
+      matrix = matrixMultiply(matrix, translationMatrix);
+
+      // 设置矩阵
+      gl.uniformMatrix3fv(matrixLocation, false, matrix);
+
+29. 动画
+      requestAnimationFrame：目的是为了让各种网页动画效果（DOM动画、Canvas动画、SVG动画、WebGL动画）能够有一个统一的刷新机制，从而节省系统资源，提高系统性能，改善视觉效果。
+      requestAnimationFrame：类似于settimeout，不过跟的是屏幕刷新率，吃的主线程资源。
+      requestAnimationFrame：详情参考：https://developer.mozilla.org/zh-CN/docs/Web/API/Window/requestAnimationFrame
+      requestAnimationFrame：在不同刷新率的屏幕动画播放的速度会不一样，所以要加入时间戳来保证速率。
+      requestAnimationFrame：说是切tab的时候会停止执行。但我试过chrome上切tab，setInterval也会停下来。
+      requestAnimationFrame：尝试挂两个回调进去也是莫得问题，应该是跑同一个时钟周期，这样就很漂亮了。
+      requestAnimationFrame：返回一个requestId，可以通过cancelAnimationFrame(requestId)中止动画。
+

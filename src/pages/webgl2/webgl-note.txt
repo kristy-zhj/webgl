@@ -1,0 +1,312 @@
+1.WebGL基础
+  《1.WebGL基本原理
+      WebGL本质是基于光栅化的API，而不是基于3D的API；WebGL只关注两个方面，即投影矩阵的坐标和投影矩阵的颜色
+      要实现的图形尺寸有多大，其投影矩阵的坐标的范围始终是从 -1 到 1
+
+
+  《2.WebGL工作原理
+      GPU有两个基础任务：一个是将点处理为投影矩阵；第二部分就是基于第一部分将相应的像素点描绘出来
+      gl.drawArrays(gl.TRIANGLES,0,9):有9个顶点需要被处理
+      每次绘制：都需要两个着色器，顶点着色器和片段着色器
+
+  《3.WebGL着色器和GLSL
+      顶点着色器：
+          属性：（从缓冲区中获取数据）
+          一直变量：（每次绘画调用时都保持一致的值）
+          纹理：（从像素中得到的数据）
+      片段着色器：
+          片段着色器的任务就是为当前被栅格化的像素提供颜色，片段着色器需要存储获取数据，通常需要三中方式：
+             一致变量：每次绘制像素点时都会调用且一直保持一致
+             纹理：从像素中获取数据
+             多变变量：从顶点着色器中传递出来且栅格化的值
+
+
+2.图像处理
+  《1.WebGL图像处理
+      1.顶点着色器
+        in vec2 a_texCoord;
+        out vec2 v_texCoord;
+        void main(){
+          v_texCoord = a_texCoord;
+        }
+      2.片段着色器来查找颜色纹理
+        precision mediump float;
+        uniform sampler2D u_image;
+        in vec2 v_texCoord;
+        void main(){
+          gl_FragColor = texture2D(u_image,v_texCoord);
+        }
+      3.图片异步加载
+        const img = new Image()
+        img.src="http://.....";
+        img.onload=function(){
+          render(img)
+        }
+      4.绘制
+
+  《2.WebGL图像处理（续）
+
+3.2D转换、旋转、伸缩、矩阵
+  《1.WebGL 2D 图像转换
+      translation：setRectangle(gl,translation[0],translation[1],width,height)
+
+  《2.WebGL 2D 图像旋转
+      1. 点的着色器
+        attribute vec2 a_position;
+        uniform vec2 u_resolution;
+        uniform vec2 u_translation;
+        uniform vec2 u_rotation;
+        vec2 rotatedPosition = vec2(
+          a_position.x * u_rotation.y + a_position.y * u_rotation.x,
+          a_position.y * u_rotation.y - a_position.x * u_rotation.x
+        )
+        vec2 position = rotatedPosition + u_translation;
+
+      2. 传递上面两个参数
+        var rotationLocation = gl.getUniformLocation(program, "u_rotation");
+        ...
+        var rotation = [0, 1];
+        ...
+        drawScene(){
+          gl.clear(gl.COLOR_BUFFER_BIT);
+          gl.uniform2fv(translationLocation, translation);
+          gl.uniform2fv(rotationLocation, rotation);
+          gl.drawArrays(gl.TRIANGLES, 0, 18);
+        }
+
+      3. 数学公式
+        rotatedX = a_position.x * u_rotation.y + a_position.y * u_rotation.x;
+        rotatedY = a_position.y * u_rotation.y - a_position.x * u_rotation.x;
+
+
+  《3.WebGL 2D 图像伸缩
+      1. 顶点着色器
+        attribute vec2 a_position;
+        uniform vec2 u_scale;
+        void main(){
+          vec2 scaledPosition = a_position * u_scale;
+          vec2 position = scaledPosition;
+        }
+
+      2. 设置伸缩比例
+        var scaleLocation = gl.getUniformLocation(program, "u_scale");
+        var scale = [1, 1];
+        drawScene(){
+          gl.uniform2fv(scaleLocation, scale);
+          gl.drawArrays(gl.TRIANGLES,0,18)
+        }
+
+  《4.WebGL 2D 矩阵
+      1. translation(tx,ty){
+        return [
+          1, 0, 0,
+          0, 1, 0,
+          tx, ty, 1
+        ];
+      }
+      2. rotation(angleInRadians){
+        var c = Math.cos(angleInRadians);
+        var s = Math.sin(angleInRadians);
+        return [
+          c,-s, 0,
+          s, c, 0,
+          0, 0, 1
+        ];
+      }
+      3. scale(sx,sy){
+        return [
+          sx, 0, 0,
+          0, sy, 0,
+          0, 0, 1
+        ];
+      }
+
+      4. 渲染方式
+        vec2 scaledPosition = a_position * u_scale;
+
+        vec2 rotatedPosition = vec2(
+        scaledPosition.x * u_rotation.y + scaledPosition.y * u_rotation.x,
+        scaledPosition.y * u_rotation.y - scaledPosition.x * u_rotation.x);
+
+        vec2 position = rotatedPosition + u_translation;
+
+      5. 绘制
+        function drawScene() {
+          //清除画布
+          gl.clear(gl.COLOR_BUFFER_BIT);
+
+          // 计算矩阵
+          var translationMatrix = makeTranslation(translation[0], translation[1]);
+          var rotationMatrix = makeRotation(angleInRadians);
+          var scaleMatrix = makeScale(scale[0], scale[1]);
+
+          // 将矩阵相乘
+          var matrix = matrixMultiply(scaleMatrix, rotationMatrix);
+          matrix = matrixMultiply(matrix, translationMatrix);
+
+          // 设置矩阵
+          gl.uniformMatrix3fv(matrixLocation, false, matrix);
+
+          // 绘制矩阵
+          gl.drawArrays(gl.TRIANGLES, 0, 18);
+        }
+
+4.3D
+  《1.WebGL 3D 正交
+      function translation(tx, ty, tz) {
+        return [
+          1,  0,  0,  0,
+          0,  1,  0,  0,
+          0,  0,  1,  0,
+          tx, ty, tz, 1
+        ];
+      }
+
+      function xRotation(angleInRadians) {
+        var c = Math.cos(angleInRadians);
+        var s = Math.sin(angleInRadians);
+
+        return [
+          1, 0, 0, 0,
+          0, c, s, 0,
+          0, -s, c, 0,
+          0, 0, 0, 1
+        ];
+      };
+
+      function yRotation(angleInRadians) {
+        var c = Math.cos(angleInRadians);
+        var s = Math.sin(angleInRadians);
+
+        return [
+          c, 0, -s, 0,
+          0, 1, 0, 0,
+          s, 0, c, 0,
+          0, 0, 0, 1
+        ];
+      };
+
+      function zRotation(angleInRadians) {
+        var c = Math.cos(angleInRadians);
+        var s = Math.sin(angleInRadians);
+        return [
+          c, s, 0, 0,
+          -s, c, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+        ];
+      }
+
+      function scale(sx, sy, sz) {
+        return [
+          sx, 0,  0,  0,
+          0, sy,  0,  0,
+          0,  0, sz,  0,
+          0,  0,  0,  1,
+        ];
+      }
+
+
+  《2.WebGL 3D 透视
+      基本上是一种事物越远显得更小的特征
+      1.顶点着色器
+        uniform float u_fudgeFactor;
+        void main(){
+          vec4 position = u_matrix * a_position;
+          float zToDivideBy = 1.0 + position.z * u_fudgeFactor;
+          gl_Position = vec4(position.xy / zToDivideBy , position.zw);
+        }
+      2. 绘制
+        var fudgeLocation = gl.getUniformLocation(program, "u_fudgeFactor");
+        var fudgeFactor = 1;
+        drawScene(){
+          gl.uniform1f(fudgeLocation, fudgeFactor);
+          gl.drawArrays(gl.TRIANGLES, 0, 16 * 6);
+        }
+      3. 生成矩阵函数
+        function makePerspective(fieldOfViewInRadians, aspect, near, far) {
+          var f = Math.tan(Math.PI * 0.5 - 0.5 * fieldOfViewInRadians);
+          var rangeInv = 1.0 / (near - far);
+
+          return [
+            f / aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (near + far) * rangeInv, -1,
+            0, 0, near * far * rangeInv * 2, 0
+          ];
+        };
+
+
+  《3.WebGL 3D 摄像机
+      1. 顶点着色器
+        in vec4 a_position;
+        uniform mat4 u_matrix;
+        void main(){
+          gl_Position = u_matrix * a_position;
+        }
+      2.  <1.计算相机朝向矩阵  lookAt
+            const matrixLocation = gl.getUniformLocation(program, "u_matrix")
+
+            const fieldOfViewInRadians = degToRad(60)
+            const cameraTarget=[0,-100,0]
+            const cameraPosition = [500, 300, 500];
+            const up = [0, 1, 0];
+            const cameraMatrix = m4.lookAt(cameraPosition, cameraTarget, up);
+
+          <2.根据相机矩阵获得视图矩阵 inverse
+            const  viewMatrix = m4.inverse(cameraMatrix);
+
+          <3.创建视图投影矩阵，并移动世界，使相机有效的成为原点
+            const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+            matrix = m4.multiply(viewProjectionMatrix, matrix);
+
+          <4.设置矩阵
+            gl.uniformMatrix4fv(matrixLocation, false, matrix);
+
+
+      3. 矩阵
+        lookAt  inverse  multiply
+
+
+5.结构与组织
+  《1.WebGL 更少代码，更多乐趣
+      顶点着色器：
+        uniform mat4 u_worldViewProjection;
+        uniform vec3 u_lightWorldPos;
+        uniform mat4 u_world;
+        uniform mat4 u_viewInverse;
+        uniform mat4 u_worldInverseTranspose;
+
+        attribute vec4 a_position;
+        attribute vec3 a_normal;
+        attribute vec2 a_texcoord;
+
+        varying vec4 v_position;
+        varying vec2 v_texCoord;
+        varying vec3 v_normal;
+        varying vec3 v_surfaceToLight;
+        varying vec3 v_surfaceToView;
+
+        void main() {
+          v_texCoord = a_texcoord;
+          v_position = (u_worldViewProjection * a_position);
+          v_normal = (u_worldInverseTranspose * vec4(a_normal, 0)).xyz;
+          v_surfaceToLight = u_lightWorldPos - (u_world * a_position).xyz;
+          v_surfaceToView = (u_viewInverse[3] - (u_world * a_position)).xyz;
+          gl_Position = v_position;
+        }
+
+
+  《2.WebGL WebGL 绘制多个东西
+  《3.WebGL WebGL 场景图
+
+6.文本
+  《1.WebGL 文本 HTML
+  《2.WebGL 文本 Canvas 2D
+  《3.WebGL 文本 纹理
+  《4.WebGL 文本 使用字符纹理
+
+
+
+https://www.w3cschool.cn/webgl/ocuj1ohu.html
+https://www.cnblogs.com/gssl/p/16456565.html

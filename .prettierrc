@@ -1,0 +1,15 @@
+{
+  "prettier.tslintIntegration": false,
+  "singleQuote": true,
+  "semi": false,
+  "endOfLine": "lf",
+  "trailingComma": "none",
+  "tabWidth": 2,
+  "arrowParens": "avoid",
+  "bracketSpacing": true,
+  "htmlWhitespaceSensitivity": "css",
+  "insertPragma": false,
+  "printWidth": 120,
+  "quoteProps": "as-needed",
+  "jsxBracketSameLine": false
+}
